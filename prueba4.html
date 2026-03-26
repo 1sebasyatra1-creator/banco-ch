@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>SISTEMA CENTRAL BANCO CH</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXoaJGpkg9siBW5y72ko6-I6lg5MtqXoI",
+      authDomain: "banco-ch.firebaseapp.com",
+      databaseURL: "https://banco-ch-default-rtdb.firebaseio.com/",
+      projectId: "banco-ch"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    const dias = ["LUN","MAR","MIÉ","JUE","VIE","SÁB","DOM"];
+    
+    const cronogramas = {
+      renzo: [
+        {hora:"06:00", texto:"Despertar (Aseo Personal)", valor:0, obligatorio:true},
+        {hora:"06:15", texto:"Cuartel (Cama tendida e impecable)", valor:2, obligatorio:false},
+        {hora:"06:30", texto:"Barrido Mañana (LUN,MIÉ,VIE,DOM)", valor:5, obligatorio:false, dias:["LUN","MIÉ","VIE","DOM"]},
+        {hora:"06:40", texto:"Ayudar en el desayuno", valor:5, obligatorio:false},
+        {hora:"07:05", texto:"Desayuno", valor:2, obligatorio:false},
+        {hora:"07:25", texto:"Lavado desayuno (MAR,JUE,SÁB)", valor:5, obligatorio:false, dias:["MAR","JUE","SÁB"]},
+        {hora:"08:00", texto:"Mantenimiento (Limpieza/Baño)", valor:20, obligatorio:false},
+        {hora:"11:00", texto:"Entrenamiento", valor:10, obligatorio:false},
+        {hora:"11:10", texto:"Ducha (post entrenamiento)", valor:0, obligatorio:true},
+        {hora:"12:00", texto:"Cocina (Preparar almuerzo)", valor:20, obligatorio:false},
+        {hora:"13:00", texto:"Estudio (Académico)", valor:15, obligatorio:false},
+        {hora:"13:55", texto:"Seguridad (Recoger Allison)", valor:5, obligatorio:false},
+        {hora:"14:15", texto:"Almorzar + Lavar servicios (LUN,MIÉ,VIE,DOM)", valor:5, obligatorio:false, dias:["LUN","MIÉ","VIE","DOM"]},
+        {hora:"15:00", texto:"Comisario (Supervisar Allison)", valor:30, obligatorio:false},
+        {hora:"17:00", texto:"Barrido Tarde (MAR,JUE,SÁB)", valor:5, obligatorio:false, dias:["MAR","JUE","SÁB"]},
+        {hora:"19:30", texto:"Cena familiar", valor:5, obligatorio:false},
+        {hora:"20:30", texto:"Lavado cena (MAR,JUE,SÁB)", valor:10, obligatorio:false, dias:["MAR","JUE","SÁB"]},
+        {hora:"20:30", texto:"Barrido noche (LUN,MIÉ,VIE,DOM)", valor:10, obligatorio:false, dias:["LUN","MIÉ","VIE","DOM"]},
+        {hora:"21:00", texto:"Cero pantallas", valor:0, obligatorio:true},
+        {hora:"21:55", texto:"Aseo nocturno", valor:0, obligatorio:true},
+        {hora:"22:00", texto:"Descanso", valor:0, obligatorio:true}
+      ],
+      allison: [
+        {hora:"06:00", texto:"Descenso y Aseo (Bajar puntual)", valor:0, obligatorio:true},
+        {hora:"06:15", texto:"Misión Botas 1", valor:5, obligatorio:false},
+        {hora:"06:30", texto:"Barrido Mañana (MAR,JUE,SÁB)", valor:10, obligatorio:false, dias:["MAR","JUE","SÁB"]},
+        {hora:"06:40", texto:"Ayudar en el desayuno", valor:10, obligatorio:false},
+        {hora:"07:05", texto:"Desayuno (Completo)", valor:10, obligatorio:false},
+        {hora:"07:25", texto:"Lavado desayuno (LUN,MIÉ,VIE,DOM)", valor:15, obligatorio:false, dias:["LUN","MIÉ","VIE","DOM"]},
+        {hora:"07:30", texto:"Salida al colegio", valor:0, obligatorio:true},
+        {hora:"14:10", texto:"Llegada a casa (Mochila en su sitio)", valor:5, obligatorio:false},
+        {hora:"14:15", texto:"Almorzar + Lavar servicios (MAR,JUE,SÁB)", valor:15, obligatorio:false, dias:["MAR","JUE","SÁB"]},
+        {hora:"15:00", texto:"Estudio (Tareas y repaso)", valor:50, obligatorio:false},
+        {hora:"17:00", texto:"Misión Botas 2", valor:5, obligatorio:false},
+        {hora:"17:10", texto:"Barrido tarde (LUN,MIÉ,VIE,DOM)", valor:15, obligatorio:false, dias:["LUN","MIÉ","VIE","DOM"]},
+        {hora:"19:30", texto:"Cena Familiar", valor:5, obligatorio:false},
+        {hora:"20:30", texto:"Lavado Cena (LUN,MIÉ,VIE,DOM)", valor:10, obligatorio:false, dias:["LUN","MIÉ","VIE","DOM"]},
+        {hora:"20:30", texto:"Barrido Noche (MAR,JUE,SÁB)", valor:10, obligatorio:false, dias:["MAR","JUE","SÁB"]},
+        {hora:"21:15", texto:"Logística (Uniforme y mochila listos)", valor:10, obligatorio:false},
+        {hora:"21:40", texto:"Misión Botas 3", valor:5, obligatorio:false},
+        {hora:"21:50", texto:"Retorno (Subida al 3er piso)", valor:0, obligatorio:true},
+        {hora:"21:55", texto:"Aseo nocturno", valor:0, obligatorio:true},
+        {hora:"22:00", texto:"Descanso", valor:0, obligatorio:true}
+      ]
+    };
+
+    const multas = [
+      {id:"respeto", texto:"Respeto Absoluto (voz/mueca/respuesta)", base:-25, grupo:"Conducta"},
+      {id:"malGana", texto:"Cero Mala Gana (actitud negativa)", base:-15, grupo:"Conducta"},
+      {id:"felino", texto:"Protocolo Felino (gato en lugar)", base:-15, grupo:"Conducta"},
+      {id:"obediencia", texto:"Obediencia Inmediata", base:-20, grupo:"Conducta"},
+      {id:"higiene", texto:"Higiene de Mesa", base:-10, grupo:"Conducta"},
+      {id:"sueno", texto:"Puntualidad de Sueño (10pm)", base:-15, grupo:"Conducta"},
+      {id:"lisuras", texto:"Cero Lisuras/Apodos", base:-10, grupo:"Conducta"},
+      {id:"horario", texto:"Cumplimiento de Horario (puntualidad)", base:-10, grupo:"Mantenimiento"},
+      {id:"limpiezaAreas", texto:"Limpieza de Áreas (migas/manchas)", base:-10, grupo:"Mantenimiento"},
+      {id:"insubordinacion", texto:"Insubordinación (negar tarea)", base:-30, grupo:"Mantenimiento"},
+      {id:"superficieC", texto:"Superficie Cero (desorden/ropa)", base:-5, grupo:"Mantenimiento"},
+      {id:"mentira", texto:"Falta de Verdad (mentir)", base:-40, grupo:"Mantenimiento"},
+      {id:"desperdicio", texto:"Desperdicio Energético (luces/agua)", base:-5, grupo:"Mantenimiento"},
+    ];
+
+    const bonos = [
+      {id:"diaPerfecto", texto:"Día Perfecto (sin multas)", valor:10},
+      {id:"semanaPerfecta", texto:"Semana Perfecta (7 días sin multas)", valor:30},
+      {id:"cartaReseteo", texto:"Carta de Reseteo (perdona falta grave)", costo:-50},
+      {id:"laptopRenzo", texto:"Bono Laptop Renzo", valor:20},
+      {id:"tareaDelOtro", texto:"Hacer tarea del otro (Renzo/Allison)", valor:10},
+    ];
+
+    const pantallas = [
+      {duracion:1, costo:-15, texto:"1 hora de pantallas"},
+      {duracion:2, costo:-25, texto:"2 horas de pantallas"},
+    ];
+
+    const initialEstado = {
+      renzo: {saldo: 0, historial: [], faltasHoy: {}, gananciasHoy: 0},
+      allison: {saldo: 0, historial: [], faltasHoy: {}, gananciasHoy: 0}
+    };
+
+    let estadoActual = {...initialEstado};
+    let connected = false;
+    let diasActualIdx = getHoyIdx();
+
+    function setConnIndicator(status) {
+      connected = status;
+      const elem = document.getElementById("conn-indicator");
+      if(elem) {
+        elem.className = "w-3 h-3 mr-2 rounded-full " + (status ? "bg-green-500" : "bg-green-500");
+        document.getElementById("conn-indicator-label").textContent = "Firebase Conectado ✓";
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem("banco_estadoActual", JSON.stringify(estadoActual));
+      set(ref(db, "banco/estadoActual"), estadoActual);
+    }
+
+    function renderSaldos() {
+      ["renzo","allison"].forEach(nombre => {
+        document.getElementById(`${nombre}-saldo`).textContent = estadoActual[nombre]?.saldo || 0;
+        document.getElementById(`${nombre}-ganancias`).textContent = estadoActual[nombre]?.gananciasHoy || 0;
+        const log = estadoActual[nombre]?.historial?.slice(-15)?.reverse() || [];
+        document.getElementById(`${nombre}-historial`).innerHTML = log.map(item =>
+          `<div class="flex text-xs items-center gap-x-2 ${item.valor<0?"text-red-400":(item.valor>0?"text-green-400":"text-slate-300")}"><span>${item.fecha || ""}</span><span class="flex-1">${item.texto}</span><span class="font-bold">${item.valor>0?"+":""}${item.valor} CH</span></div>`
+        ).join("");
+      });
+    }
+
+    window.accionSaldo = function(nombre, valor, texto) {
+      if(!estadoActual[nombre]) estadoActual[nombre] = {saldo:0, historial:[], faltasHoy:{}, gananciasHoy:0};
+      estadoActual[nombre].saldo += valor;
+      if(valor > 0) {
+        estadoActual[nombre].gananciasHoy += valor;
+      }
+      estadoActual[nombre].historial.push({
+        texto: texto,
+        valor,
+        fecha: new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'})
+      });
+      saveData();
+      renderSaldos();
+    };
+
+    window.aplicarMulta = function(nombre, multaId) {
+      const multa = multas.find(m => m.id === multaId);
+      if(!multa) return;
+      
+      if(!estadoActual[nombre].faltasHoy) estadoActual[nombre].faltasHoy = {};
+      
+      let valor = multa.base;
+      let esModocastigo = false;
+      
+      if(estadoActual[nombre].faltasHoy[multaId]) {
+        esModocastigo = true;
+        valor *= 2;
+      }
+      
+      estadoActual[nombre].faltasHoy[multaId] = true;
+      
+      let texteFinal = multa.texto + (esModocastigo ? " 🚨 MODO CASTIGO (DUPLICADA)" : "");
+      accionSaldo(nombre, valor, texteFinal);
+    };
+
+    window.aplicarBono = function(nombre, bonoId) {
+      const bono = bonos.find(b => b.id === bonoId);
+      if(!bono) return;
+      
+      if(bonoId === "cartaReseteo") {
+        if(estadoActual[nombre].saldo < 50) {
+          alert(`${nombre} necesita al menos 50 CH para la Carta de Reseteo`);
+          return;
+        }
+        accionSaldo(nombre, bono.costo, bono.texto + " (celular recuperado)");
+      } else {
+        accionSaldo(nombre, bono.valor, bono.texto);
+      }
+    };
+
+    window.aplicarPantallas = function(nombre, horas) {
+      const p = pantallas.find(x => x.duracion === horas);
+      if(!p) return;
+      if(estadoActual[nombre].saldo < Math.abs(p.costo)) {
+        alert(`${nombre} no tiene saldo suficiente para ${p.texto}`);
+        return;
+      }
+      accionSaldo(nombre, p.costo, p.texto);
+    };
+
+    window.sumarRapido = function(nombre, monto) {
+      accionSaldo(nombre, monto, `Bono Rápido +${monto} CH`);
+    };
+
+    window.restarRapido = function(nombre, monto) {
+      accionSaldo(nombre, -monto, `Multa Rápida -${monto} CH`);
+    };
+
+    window.ajustePersonalizado = function(nombre) {
+      let monto = prompt(`Ingresa el monto CH para ${nombre} (positivo para bono, negativo para multa):`, "0");
+      if(monto === null) return;
+      monto = parseInt(monto);
+      if(isNaN(monto)) {
+        alert("Monto inválido");
+        return;
+      }
+      const texto = monto > 0 ? `Ajuste manual +${monto} CH` : `Ajuste manual ${monto} CH`;
+      accionSaldo(nombre, monto, texto);
+    };
+
+    window.transferencia = function(tipo) {
+      if(tipo === "laptopRenzo") {
+        accionSaldo("renzo", 20, "Laptop Renzo (préstamo) +20 CH");
+      } else if(tipo === "tareaRenzo") {
+        accionSaldo("renzo", 10, "Hizo tarea de Allison +10 CH");
+        accionSaldo("allison", -10, "Renzo hizo su tarea -10 CH");
+      } else if(tipo === "tareaAllison") {
+        accionSaldo("allison", 10, "Hizo tarea de Renzo +10 CH");
+        accionSaldo("renzo", -10, "Allison hizo su tarea -10 CH");
+      }
+    };
+
+    window.resetSaldos = function() {
+      if(confirm("¿Seguro que quieres REINICIAR los saldos e historial?")) {
+        estadoActual = JSON.parse(JSON.stringify(initialEstado));
+        saveData();
+        renderSaldos();
+        alert("Banco reiniciado");
+      }
+    };
+
+    // SIGUIENTE DÍA
+    window.siguienteDia = function() {
+      diasActualIdx = (diasActualIdx + 1) % 7;
+      estadoActual.renzo.faltasHoy = {};
+      estadoActual.allison.faltasHoy = {};
+      estadoActual.renzo.gananciasHoy = 0;
+      estadoActual.allison.gananciasHoy = 0;
+      saveData();
+      
+      // Desmarcar checkboxes
+      document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+        cb.disabled = false;
+      });
+      
+      renderTareas(diasActualIdx);
+      renderSaldos();
+      alert(`Pasaste al día: ${dias[diasActualIdx]}`);
+    };
+
+    function getHoyIdx() {
+      let hoyJS = new Date().getDay();
+      return hoyJS===0 ? 6 : hoyJS-1;
+    }
+
+    function renderTareas(diaSemanaIdx) {
+      ["renzo", "allison"].forEach(nombre => {
+        const items = cronogramas[nombre];
+        const hoy = dias[diaSemanaIdx];
+        document.getElementById(`${nombre}-tareas`).innerHTML =
+          items.map((t, idx) => {
+            let diaActivo = !t.dias || t.dias.includes(hoy);
+            let disabledCheck = t.obligatorio ? "" : (diaActivo?"":"disabled");
+            return `
+            <label class="flex items-center gap-x-2 text-xs p-1 mb-1 rounded-lg ${t.obligatorio ? "border-yellow-400 border" : "border-transparent"} ${diaActivo ? "" : "opacity-40 line-through"}">
+              <input type="checkbox" class="form-checkbox h-4 w-4 ${t.obligatorio ? "accent-yellow-400" : "accent-green-400"}" onchange="completarTarea('${nombre}',${idx},${t.valor},'${t.texto.replace(/'/g,"\\'")}',${t.obligatorio},this,${diaActivo})" ${disabledCheck}>
+              <span class="w-12 font-mono text-slate-400">${t.hora}</span>
+              <span class="flex-1">${t.texto}${t.obligatorio ? ' <span class="text-yellow-400 font-bold text-xs">(Obligatorio)</span>':''}</span>
+              ${t.valor!==0? `<span class="font-bold text-xs">${t.valor>0?'+':''}${t.valor}</span>` : ""}
+            </label>`;
+          }).join("");
+      });
+    }
+
+    window.completarTarea = function(nombre, key, valor, texto, obligatorio, checkbox, diaActivo) {
+      if(diaActivo && checkbox.checked && !obligatorio && valor) {
+        accionSaldo(nombre, valor, texto+" ✔️");
+        checkbox.disabled = true;
+      }
+    };
+
+    let firstLoad = true;
+    document.addEventListener("DOMContentLoaded", () => {
+      setConnIndicator(false);
+      renderSaldos();
+      renderTareas(diasActualIdx);
+
+      signInAnonymously(auth);
+      onAuthStateChanged(auth,user=>{
+        if(user){
+          const fireRef = ref(db, "banco/estadoActual");
+          onValue(fireRef, (snap) => {
+            setConnIndicator(true);
+            if (snap.exists()) {
+              const data = snap.val();
+              if(JSON.stringify(data)!==JSON.stringify(estadoActual)){
+                estadoActual = data;
+                localStorage.setItem("banco_estadoActual", JSON.stringify(estadoActual));
+                renderSaldos();
+              }
+              if(firstLoad){
+                renderTareas(diasActualIdx);
+                firstLoad=false;
+              }
+            }
+          }, { onlyOnce: false });
+        }
+      });
+
+      try {
+        const localData = JSON.parse(localStorage.getItem("banco_estadoActual"));
+        if(localData){
+          estadoActual = localData;
+          renderSaldos();
+        }
+      }catch{}
+
+      document.documentElement.classList.add("dark");
+    });
+  </script>
+</head>
+<body class="bg-slate-950 min-h-screen text-slate-100 font-sans px-2 py-4">
+  <div class="max-w-6xl mx-auto">
+
+    <!-- HEADER -->
+    <header class="flex flex-col md:flex-row gap-2 md:gap-4 items-center justify-between mb-6">
+      <div class="flex items-center mb-2 md:mb-0">
+        <span id="conn-indicator" class="w-3 h-3 mr-2 rounded-full bg-green-500"></span>
+        <span id="conn-indicator-label" class="text-xs text-green-400">Firebase Conectado ✓</span>
+      </div>
+      <h1 class="text-2xl font-semibold text-center bg-gradient-to-r from-yellow-400 via-green-400 to-blue-400 bg-clip-text text-transparent tracking-wide">
+        SISTEMA CENTRAL BANCO CH
+      </h1>
+      <div class="flex gap-2">
+        <button onclick="siguienteDia()" class="px-3 py-1 rounded text-xs border border-blue-400 text-blue-400 hover:bg-blue-900/[.15] transition font-bold">
+          → Siguiente Día
+        </button>
+        <button onclick="resetSaldos()" class="px-3 py-1 rounded text-xs border border-red-400 text-red-400 hover:bg-red-900/[.15] transition">
+          Reiniciar Banco
+        </button>
+      </div>
+    </header>
+
+    <!-- PANELES PRINCIPALES RENZO Y ALLISON -->
+    <main class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <!-- RENZO -->
+      <section class="bg-slate-800 rounded-xl border-2 border-green-700 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-bold text-green-300">RENZO</h2>
+          <div class="flex gap-4">
+            <div>
+              <p class="text-xs text-slate-400">Cartera Total</p>
+              <span class="text-lg font-mono text-green-400">CH: <span id="renzo-saldo" class="text-2xl">0</span></span>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400">Ganancias Hoy</p>
+              <span class="text-lg font-mono text-green-300">+<span id="renzo-ganancias" class="text-2xl">0</span> CH</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <h3 class="mb-2 font-semibold text-slate-200 text-sm">Tareas de Hoy</h3>
+          <div id="renzo-tareas" class="max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <div class="mb-4">
+          <h3 class="mb-2 font-semibold text-slate-300 text-sm">Últimos Movimientos</h3>
+          <div id="renzo-historial" class="grid gap-y-1 text-xs max-h-32 overflow-y-auto"></div>
+        </div>
+      </section>
+
+      <!-- ALLISON -->
+      <section class="bg-slate-800 rounded-xl border-2 border-yellow-500 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-bold text-yellow-300">ALLISON</h2>
+          <div class="flex gap-4">
+            <div>
+              <p class="text-xs text-slate-400">Cartera Total</p>
+              <span class="text-lg font-mono text-yellow-400">CH: <span id="allison-saldo" class="text-2xl">0</span></span>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400">Ganancias Hoy</p>
+              <span class="text-lg font-mono text-yellow-300">+<span id="allison-ganancias" class="text-2xl">0</span> CH</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <h3 class="mb-2 font-semibold text-slate-200 text-sm">Tareas de Hoy</h3>
+          <div id="allison-tareas" class="max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <div class="mb-4">
+          <h3 class="mb-2 font-semibold text-slate-300 text-sm">Últimos Movimientos</h3>
+          <div id="allison-historial" class="grid gap-y-1 text-xs max-h-32 overflow-y-auto"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===== CONTROLES RÁPIDOS ===== -->
+    <section class="bg-slate-900 rounded-xl p-4 border-2 border-slate-700 mb-6">
+      <h2 class="text-lg font-bold mb-4 text-center">🎮 CONTROLES RÁPIDOS - SUMAS Y RESTAS</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- RENZO CONTROLES -->
+        <div class="bg-slate-800 p-4 rounded-lg border border-green-700">
+          <h3 class="font-bold text-green-400 mb-3">RENZO - Controles Rápidos</h3>
+          
+          <div class="mb-3">
+            <p class="text-xs text-slate-400 mb-2">💰 Sumar CH</p>
+            <div class="grid grid-cols-3 gap-1">
+              <button onclick="sumarRapido('renzo', 1)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+1</button>
+              <button onclick="sumarRapido('renzo', 5)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+5</button>
+              <button onclick="sumarRapido('renzo', 10)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+10</button>
+              <button onclick="sumarRapido('renzo', 20)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+20</button>
+              <button onclick="sumarRapido('renzo', 50)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+50</button>
+              <button onclick="sumarRapido('renzo', 100)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+100</button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <p class="text-xs text-slate-400 mb-2">❌ Restar CH (Multas)</p>
+            <div class="grid grid-cols-3 gap-1">
+              <button onclick="restarRapido('renzo', 1)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-1</button>
+              <button onclick="restarRapido('renzo', 5)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-5</button>
+              <button onclick="restarRapido('renzo', 10)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-10</button>
+              <button onclick="restarRapido('renzo', 20)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-20</button>
+              <button onclick="restarRapido('renzo', 50)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-50</button>
+              <button onclick="restarRapido('renzo', 100)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-100</button>
+            </div>
+          </div>
+
+          <button onclick="ajustePersonalizado('renzo')" class="w-full bg-blue-700 hover:bg-blue-600 rounded px-3 py-2 text-sm font-bold transition">
+            ⚙️ Monto Personalizado
+          </button>
+        </div>
+
+        <!-- ALLISON CONTROLES -->
+        <div class="bg-slate-800 p-4 rounded-lg border border-yellow-700">
+          <h3 class="font-bold text-yellow-400 mb-3">ALLISON - Controles Rápidos</h3>
+          
+          <div class="mb-3">
+            <p class="text-xs text-slate-400 mb-2">💰 Sumar CH</p>
+            <div class="grid grid-cols-3 gap-1">
+              <button onclick="sumarRapido('allison', 1)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+1</button>
+              <button onclick="sumarRapido('allison', 5)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+5</button>
+              <button onclick="sumarRapido('allison', 10)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+10</button>
+              <button onclick="sumarRapido('allison', 20)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+20</button>
+              <button onclick="sumarRapido('allison', 50)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+50</button>
+              <button onclick="sumarRapido('allison', 100)" class="bg-green-700 hover:bg-green-600 rounded px-2 py-2 text-sm font-bold transition">+100</button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <p class="text-xs text-slate-400 mb-2">❌ Restar CH (Multas)</p>
+            <div class="grid grid-cols-3 gap-1">
+              <button onclick="restarRapido('allison', 1)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-1</button>
+              <button onclick="restarRapido('allison', 5)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-5</button>
+              <button onclick="restarRapido('allison', 10)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-10</button>
+              <button onclick="restarRapido('allison', 20)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-20</button>
+              <button onclick="restarRapido('allison', 50)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-50</button>
+              <button onclick="restarRapido('allison', 100)" class="bg-red-700 hover:bg-red-600 rounded px-2 py-2 text-sm font-bold transition">-100</button>
+            </div>
+          </div>
+
+          <button onclick="ajustePersonalizado('allison')" class="w-full bg-blue-700 hover:bg-blue-600 rounded px-3 py-2 text-sm font-bold transition">
+            ⚙️ Monto Personalizado
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MULTAS DEL REGLAMENTO ===== -->
+    <section class="bg-slate-900 rounded-xl p-4 border-2 border-red-700 mb-6">
+      <h2 class="text-lg font-bold mb-4 text-center text-red-400">⚖️ APLICAR MULTAS (Modo Castigo: Duplica en 2da falta)</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- RENZO MULTAS -->
+        <div class="bg-slate-800 p-4 rounded-lg">
+          <h3 class="font-bold text-red-400 mb-3">RENZO - Multas</h3>
+          <div class="grid gap-2">
+            <button onclick="aplicarMulta('renzo', 'respeto')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Respeto Absoluto (-25)</button>
+            <button onclick="aplicarMulta('renzo', 'malGana')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Cero Mala Gana (-15)</button>
+            <button onclick="aplicarMulta('renzo', 'felino')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Protocolo Felino (-15)</button>
+            <button onclick="aplicarMulta('renzo', 'obediencia')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Obediencia Inmediata (-20)</button>
+            <button onclick="aplicarMulta('renzo', 'higiene')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Higiene de Mesa (-10)</button>
+            <button onclick="aplicarMulta('renzo', 'sueno')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Puntualidad Sueño (-15)</button>
+            <button onclick="aplicarMulta('renzo', 'lisuras')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Cero Lisuras (-10)</button>
+            <button onclick="aplicarMulta('renzo', 'horario')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Cumpl. Horario (-10)</button>
+            <button onclick="aplicarMulta('renzo', 'limpiezaAreas')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Limpieza Áreas (-10)</button>
+            <button onclick="aplicarMulta('renzo', 'insubordinacion')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Insubordinación (-30)</button>
+            <button onclick="aplicarMulta('renzo', 'superficieC')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Superficie Cero (-5)</button>
+            <button onclick="aplicarMulta('renzo', 'mentira')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Falta de Verdad (-40)</button>
+            <button onclick="aplicarMulta('renzo', 'desperdicio')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Desperdicio Energía (-5)</button>
+          </div>
+        </div>
+
+        <!-- ALLISON MULTAS -->
+        <div class="bg-slate-800 p-4 rounded-lg">
+          <h3 class="font-bold text-red-400 mb-3">ALLISON - Multas</h3>
+          <div class="grid gap-2">
+            <button onclick="aplicarMulta('allison', 'respeto')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Respeto Absoluto (-25)</button>
+            <button onclick="aplicarMulta('allison', 'malGana')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Cero Mala Gana (-15)</button>
+            <button onclick="aplicarMulta('allison', 'felino')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Protocolo Felino (-15)</button>
+            <button onclick="aplicarMulta('allison', 'obediencia')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Obediencia Inmediata (-20)</button>
+            <button onclick="aplicarMulta('allison', 'higiene')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Higiene de Mesa (-10)</button>
+            <button onclick="aplicarMulta('allison', 'sueno')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Puntualidad Sueño (-15)</button>
+            <button onclick="aplicarMulta('allison', 'lisuras')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Cero Lisuras (-10)</button>
+            <button onclick="aplicarMulta('allison', 'horario')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Cumpl. Horario (-10)</button>
+            <button onclick="aplicarMulta('allison', 'limpiezaAreas')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Limpieza Áreas (-10)</button>
+            <button onclick="aplicarMulta('allison', 'insubordinacion')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Insubordinación (-30)</button>
+            <button onclick="aplicarMulta('allison', 'superficieC')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Superficie Cero (-5)</button>
+            <button onclick="aplicarMulta('allison', 'mentira')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Falta de Verdad (-40)</button>
+            <button onclick="aplicarMulta('allison', 'desperdicio')" class="bg-red-900 hover:bg-red-700 text-red-200 text-xs py-1 px-2 rounded font-bold transition">Desperdicio Energía (-5)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BONOS, PREMIOS Y PANTALLAS ===== -->
+    <section class="bg-slate-900 rounded-xl p-4 border-2 border-yellow-600 mb-6">
+      <h2 class="text-lg font-bold mb-4 text-center text-yellow-400">🎁 BONOS, PREMIOS Y PANTALLAS</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- RENZO BONOS -->
+        <div class="bg-slate-800 p-4 rounded-lg border border-green-700">
+          <h3 class="font-bold text-green-400 mb-3">RENZO</h3>
+          <div class="grid gap-2">
+            <button onclick="aplicarBono('renzo', 'diaPerfecto')" class="bg-green-900 hover:bg-green-700 text-green-200 text-xs py-1 px-2 rounded font-bold transition">✨ Día Perfecto (+10)</button>
+            <button onclick="aplicarBono('renzo', 'semanaPerfecta')" class="bg-green-900 hover:bg-green-700 text-green-200 text-xs py-1 px-2 rounded font-bold transition">🏆 Semana Perfecta (+30)</button>
+            <button onclick="aplicarBono('renzo', 'laptopRenzo')" class="bg-blue-900 hover:bg-blue-700 text-blue-200 text-xs py-1 px-2 rounded font-bold transition">💻 Bono Laptop (+20)</button>
+            <button onclick="aplicarBono('renzo', 'cartaReseteo')" class="bg-purple-900 hover:bg-purple-700 text-purple-200 text-xs py-1 px-2 rounded font-bold transition">🔓 Carta Reseteo (-50)</button>
+            <hr class="my-2 border-slate-600"/>
+            <button onclick="aplicarPantallas('renzo', 1)" class="bg-orange-900 hover:bg-orange-700 text-orange-200 text-xs py-1 px-2 rounded font-bold transition">📱 1h Pantallas (-15)</button>
+            <button onclick="aplicarPantallas('renzo', 2)" class="bg-orange-900 hover:bg-orange-700 text-orange-200 text-xs py-1 px-2 rounded font-bold transition">📱 2h Pantallas (-25)</button>
+            <hr class="my-2 border-slate-600"/>
+            <button onclick="transferencia('tareaRenzo')" class="bg-indigo-900 hover:bg-indigo-700 text-indigo-200 text-xs py-1 px-2 rounded font-bold transition">👥 Renzo hace tarea de Allison (+10)</button>
+          </div>
+        </div>
+
+        <!-- ALLISON BONOS -->
+        <div class="bg-slate-800 p-4 rounded-lg border border-yellow-700">
+          <h3 class="font-bold text-yellow-400 mb-3">ALLISON</h3>
+          <div class="grid gap-2">
+            <button onclick="aplicarBono('allison', 'diaPerfecto')" class="bg-green-900 hover:bg-green-700 text-green-200 text-xs py-1 px-2 rounded font-bold transition">✨ Día Perfecto (+10)</button>
+            <button onclick="aplicarBono('allison', 'semanaPerfecta')" class="bg-green-900 hover:bg-green-700 text-green-200 text-xs py-1 px-2 rounded font-bold transition">🏆 Semana Perfecta (+30)</button>
+            <button onclick="aplicarBono('allison', 'cartaReseteo')" class="bg-purple-900 hover:bg-purple-700 text-purple-200 text-xs py-1 px-2 rounded font-bold transition">🔓 Carta Reseteo (-50)</button>
+            <button onclick="accionSaldo('allison', 5, 'Tiempo Papá (+5)')" class="bg-pink-900 hover:bg-pink-700 text-pink-200 text-xs py-1 px-2 rounded font-bold transition">💑 Tiempo Papá (+5)</button>
+            <hr class="my-2 border-slate-600"/>
+            <button onclick="aplicarPantallas('allison', 1)" class="bg-orange-900 hover:bg-orange-700 text-orange-200 text-xs py-1 px-2 rounded font-bold transition">📱 1h Pantallas (-15)</button>
+            <button onclick="aplicarPantallas('allison', 2)" class="bg-orange-900 hover:bg-orange-700 text-orange-200 text-xs py-1 px-2 rounded font-bold transition">📱 2h Pantallas (-25)</button>
+            <hr class="my-2 border-slate-600"/>
+            <button onclick="transferencia('tareaAllison')" class="bg-indigo-900 hover:bg-indigo-700 text-indigo-200 text-xs py-1 px-2 rounded font-bold transition">👥 Allison hace tarea de Renzo (+10)</button>
+          </div>
+        </div>
+
+        <!-- INFO -->
+        <div class="bg-slate-800 p-4 rounded-lg border border-blue-700">
+          <h3 class="font-bold text-blue-400 mb-3">📋 RESUMEN DINÁMICAS</h3>
+          <ul class="text-xs text-slate-300 space-y-1">
+            <li><span class="font-bold">Día Perfecto:</span> +10 CH (sin multas)</li>
+            <li><span class="font-bold">Semana Perfecta:</span> +30 CH (7 días sin multas)</li>
+            <li><span class="font-bold">Carta Reseteo:</span> -50 CH (perdona falta grave)</li>
+            <li><span class="font-bold">Laptop Renzo:</span> +20 CH (préstamo)</li>
+            <li><span class="font-bold">Hacer tarea:</span> +10 CH al otro -10 CH (intercambio)</li>
+            <li><span class="font-bold">1h Pantallas:</span> -15 CH</li>
+            <li><span class="font-bold">2h Pantallas:</span> -25 CH</li>
+            <li class="mt-2 pt-2 border-t border-slate-600"><span class="font-bold">🚨 MODO CASTIGO:</span> Si se repite falta del mismo día, se duplica la multa</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- REGLAMENTO COMPLETO -->
+    <section class="bg-slate-900 rounded-xl p-4 border-2 border-slate-700">
+      <h2 class="text-lg font-bold mb-3">📜 REGLAMENTO BANCARIO COMPLETO</h2>
+      <details class="cursor-pointer">
+        <summary class="font-bold text-yellow-300">Ver Constitución y Régimen Disciplinario</summary>
+        <div class="text-xs text-slate-300 mt-4 whitespace-pre-wrap leading-snug max-h-96 overflow-y-auto">
+🏛️ BANCO CENTRAL CH: CONSTITUCIÓN Y RÉGIMEN DISCIPLINARIO
+Casa HC | Gobernador: Sebastián Rafael
+
+I. CÓDIGO DE CONDUCTA (Reglas de Hierro)
+✓ Respeto Absoluto: Prohibido alzar la voz, muecas, contestar mal o ignorar. MULTA: -$25 CH
+✓ Cero "Mala Gana": Actitud desafiante/negativa al realizar tareas. MULTA: -$15 CH
+✓ Protocolo Felino: PROHIBIDO subir al gato a sillón/mesas/camas. MULTA: -$15 CH
+✓ Obediencia Inmediata: Cumplir órdenes a la primera. MULTA: -$20 CH
+✓ Higiene de Mesa: Lavar y limpiar inmediatamente después de comer. MULTA: -$10 CH
+✓ Puntualidad de Sueño: 10:00 PM luces apagadas. MULTA: -$15 CH
+✓ Cero Lisuras: No palabras ofensivas o apodos. MULTA: -$10 CH
+
+II. REGLAS DE CONVIVENCIA Y MANTENIMIENTO
+✓ Cumplimiento de Horario: Iniciar tareas en minuto exacto. MULTA: -$10 CH
+✓ Limpieza de Áreas: No dejar migas, manchas, desorden. MULTA: -$10 CH
+✓ Insubordinación: Negarse a tarea asignada. MULTA: -$30 CH
+✓ Superficie Cero: No dejar ropa, mochilas, zapatos fuera. MULTA: -$5 CH
+✓ Falta de Verdad: Mentir o engañar al Banco. MULTA: -$40 CH
+✓ Desperdicio Energético: Luces prendidas o agua corriendo. MULTA: -$5 CH
+
+III. RÉGIMEN DE REINCIDENCIA Y CASTIGO
+→ Primera falta: Monto base de la tabla.
+→ Segunda falta (MISMO DÍA, MISMA REGLA): SE DUPLICA LA MULTA. 🚨 MODO CASTIGO
+→ Falta Grave/Negligencia Grave: ARRESTO.
+
+IV. ESTATUTOS Y BONOS BANCARIOS
+✓ Bono Día Perfecto: +10 CH (sin multas en 1 día)
+✓ Bono Semana Impecable: +30 CH (7 días sin multas)
+✓ Impuesto de Supervisión: Si Renzo corrige tarea de Allison, se transfiere monto como penalidad.
+✓ Fondo de Reseteo: Carta de Reseteo -50 CH (perdona celular tras falta grave)
+✓ Bono Laptop Renzo: +20 CH (préstamo de dispositivo)
+✓ Hacer Tarea del Otro: +10 CH al que la hace, -10 CH al otro.
+✓ Uso de Pantallas: -15 CH (1 hora), -25 CH (2 horas)
+
+⚠️ NOTA IMPORTANTE: El Gobernador (Sebastián Rafael) puede aplicar multas discrecionales si considera que el ambiente de la casa se ve afectado por la actitud de un miembro.
+        </div>
+      </details>
+    </section>
+
+  </div>
+</body>
+</html>
